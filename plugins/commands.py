@@ -40,26 +40,45 @@ async def accept(client, message):
         await acc.connect()
     except:
         return await show.edit("**Your Login Session Expired. So /logout First Then Login Again By - /login**")
+
     show = await show.edit("**Now Forward A Message From Your Channel Or Group With Forward Tag\n\nMake Sure Your Logged In Account Is Admin In That Channel Or Group With Full Rights.**")
     vj = await client.listen(message.chat.id)
+
     if vj.forward_from_chat and not vj.forward_from_chat.type in [enums.ChatType.PRIVATE, enums.ChatType.BOT]:
         chat_id = vj.forward_from_chat.id
         try:
             info = await acc.get_chat(chat_id)
         except:
-            await show.edit("**Error - Make Sure Your Logged In Account Is Admin In This Channel Or Group With Rights.**")
+            return await show.edit("**Error - Make Sure Your Logged In Account Is Admin In This Channel Or Group With Rights.**")
     else:
         return await message.reply("**Message Not Forwarded From Channel Or Group.**")
+
     await vj.delete()
     msg = await show.edit("**Accepting all join requests... Please wait until it's completed.**")
+
+    success = 0
+    failed = 0
     try:
         while True:
-            await acc.approve_all_chat_join_requests(chat_id)
-            await asyncio.sleep(1)
-            join_requests = [request async for request in acc.get_chat_join_requests(chat_id)]
+            join_requests = [req async for req in acc.get_chat_join_requests(chat_id)]
             if not join_requests:
                 break
-        await msg.edit("**Successfully accepted all join requests.**")
+            for req in join_requests:
+                try:
+                    await acc.approve_chat_join_request(chat_id, req.from_user.id)
+                    try:
+                        await client.send_message(
+                            req.from_user.id,
+                            f"**Hello {req.from_user.mention}!\nWelcome To {info.title}\n\n__Powered By : @VJ_Botz__**"
+                        )
+                    except Exception as e:
+                        print(f"Failed to send message to {req.from_user.id}: {e}")
+                    success += 1
+                except Exception as e:
+                    print(f"Failed to approve {req.from_user.id}: {e}")
+                    failed += 1
+            await asyncio.sleep(1)
+        await msg.edit(f"**Successfully accepted join requests.**\n\n✅ Success: {success}\n❌ Failed: {failed}")
     except Exception as e:
         await msg.edit(f"**An error occurred:** {str(e)}")
         
