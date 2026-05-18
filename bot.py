@@ -21,12 +21,12 @@ class Bot(Client):
         me = await self.get_me()
         self.username = '@' + me.username
             
-        print('Bot Started Powered By @VJ_Botz')
+        print('Bot Started Powered By @Codeflix_Bots')
 
 
     async def stop(self, *args):
 
         await super().stop()
-        print('Bot Stopped Bye')
+        print('Bot Stopped')
 
 Bot().run()
