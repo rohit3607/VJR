@@ -2,7 +2,6 @@ pyrofork==2.3.48
 Tgcrypto
 motor
 psutil
-shutil
 asyncio
 aiohttp
 Flask==1.1.2
