@@ -1,3 +1,5 @@
+import asyncio
+import os, sys
 from os import environ
 
 API_ID = int(environ.get("API_ID", "20959976"))
