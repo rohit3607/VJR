@@ -20,10 +20,8 @@ async def start_message(c,m):
         caption=f"<b>Hello {m.from_user.mention} 👋\n\nI Am Join Request Acceptor Bot. I Can Accept All Old Pending Join Request.\n\nFor All Pending Join Request Use - /accept</b>",
         reply_markup=InlineKeyboardMarkup(
             [[
-                InlineKeyboardButton('💝 sᴜʙsᴄʀɪʙᴇ ʏᴏᴜᴛᴜʙᴇ ᴄʜᴀɴɴᴇʟ', url='https://youtube.com/@Tech_VJ')
-            ],[
-                InlineKeyboardButton("❣️ ᴅᴇᴠᴇʟᴏᴘᴇʀ", url='https://t.me/Kingvj01'),
-                InlineKeyboardButton("🤖 ᴜᴘᴅᴀᴛᴇ", url='https://t.me/VJ_Botz')
+                InlineKeyboardButton("❣️ ᴅᴇᴠᴇʟᴏᴘᴇʀ", url='https://t.me/roger_pro'),
+                InlineKeyboardButton("🤖 ᴜᴘᴅᴀᴛᴇ", url='https://t.me/Codeflix_Bots')
             ]]
         )
     )
@@ -69,7 +67,7 @@ async def accept(client, message):
                     try:
                         await client.send_message(
                             req.from_user.id,
-                            f"**Hello {req.from_user.mention}!\nWelcome To {info.title}\n\n__Powered By : @VJ_Botz__**"
+                            f"**Hello {req.from_user.mention}!\nWelcome To {info.title}\n\n__Powered By : @Codeflix_bots__**"
                         )
                     except Exception as e:
                         print(f"Failed to send message to {req.from_user.id}: {e}")
@@ -92,7 +90,7 @@ async def approve_new(client, m):
             await client.send_message(LOG_CHANNEL, LOG_TEXT.format(m.from_user.id, m.from_user.mention))
         await client.approve_chat_join_request(m.chat.id, m.from_user.id)
         try:
-            await client.send_message(m.from_user.id, "**Hello {}!\nWelcome To {}\n\n__Powered By : @VJ_Botz __**".format(m.from_user.mention, m.chat.title))
+            await client.send_message(m.from_user.id, "**Hello {}!\nWelcome To {}\n\n__Powered By : @Codeflix_bots __**".format(m.from_user.mention, m.chat.title))
         except:
             pass
     except Exception as e:
