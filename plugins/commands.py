@@ -1,6 +1,14 @@
 import asyncio 
 from pyrogram import Client, filters, enums
 from config import LOG_CHANNEL, API_ID, API_HASH, NEW_REQ_MODE
+from pyrogram.errors import (
+    InputUserDeactivated,
+    UserNotParticipant,
+    FloodWait,
+    UserIsBlocked,
+    PeerIdInvalid,
+    UserAlreadyParticipant
+)
 from plugins.database import db
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
@@ -102,7 +110,6 @@ async def approve_new(client, m):
 # =========================
 
 
-from pyrogram.errors import InputUserDeactivated, UserNotParticipant, FloodWait, UserIsBlocked, PeerIdInvalid
 from plugins.database import db
 from pyrogram import Client, filters
 from pyrogram.types import Message
