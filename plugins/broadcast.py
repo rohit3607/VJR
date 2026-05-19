@@ -12,73 +12,377 @@ import platform
 import shutil
 
 
-
-
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-async def broadcast_messages(user_id, message):
+# ==========================================
+# CANCEL SYSTEM
+# ==========================================
+cancel_lock = asyncio.Lock()
+is_canceled = False
+
+
+# ==========================================
+# AUTO DELETE
+# ==========================================
+async def auto_delete(sent_msg, duration):
+
+    await asyncio.sleep(duration)
+
     try:
-        await message.copy(chat_id=user_id)
+        await sent_msg.delete()
+    except:
+        pass
+
+
+# ==========================================
+# SEND BROADCAST MESSAGE
+# ==========================================
+async def broadcast_messages(
+    bot,
+    user_id,
+    message,
+    do_pin=False,
+    do_delete=False,
+    duration=0,
+    silent=False
+):
+
+    try:
+
+        sent_msg = await message.copy(
+            chat_id=user_id,
+            disable_notification=silent
+        )
+
+        # PIN MESSAGE
+        if do_pin:
+
+            try:
+                await bot.pin_chat_message(
+                    chat_id=user_id,
+                    message_id=sent_msg.id,
+                    both_sides=True
+                )
+            except:
+                pass
+
+        # AUTO DELETE
+        if do_delete:
+            asyncio.create_task(
+                auto_delete(sent_msg, duration)
+            )
+
         return True, "Success"
+
     except FloodWait as e:
+
         await asyncio.sleep(e.value)
-        return await broadcast_messages(user_id, message)
+
+        return await broadcast_messages(
+            bot,
+            user_id,
+            message,
+            do_pin,
+            do_delete,
+            duration,
+            silent
+        )
+
     except InputUserDeactivated:
+
         await db.delete_user(int(user_id))
-        logging.info(f"{user_id}-Removed from Database, since deleted account.")
+
+        logging.info(
+            f"{user_id} - Removed from Database (Deleted Account)"
+        )
+
         return False, "Deleted"
+
     except UserIsBlocked:
+
         await db.delete_user(int(user_id))
-        logging.info(f"{user_id} -Blocked the bot.")
+
+        logging.info(
+            f"{user_id} - Blocked the bot"
+        )
+
         return False, "Blocked"
+
     except PeerIdInvalid:
+
         await db.delete_user(int(user_id))
-        logging.info(f"{user_id} - PeerIdInvalid")
+
+        logging.info(
+            f"{user_id} - PeerIdInvalid"
+        )
+
         return False, "Error"
+
     except Exception as e:
+
+        logging.error(
+            f"Broadcast Error {user_id}: {e}"
+        )
+
         return False, "Error"
 
 
-@Client.on_message(filters.command("broadcast") & filters.user(ADMINS) & filters.reply)
-async def verupikkals(bot, message):
-    users = await db.get_all_users()
-    b_msg = message.reply_to_message
-    sts = await message.reply_text(
-        text='Broadcasting your messages...'
+# ==========================================
+# CANCEL COMMAND
+# ==========================================
+@Client.on_message(
+    filters.command("cancel")
+    & filters.user(ADMINS)
+)
+async def cancel_broadcast(bot, message):
+
+    global is_canceled
+
+    async with cancel_lock:
+        is_canceled = True
+
+    await message.reply_text(
+        "<b>Broadcast cancellation requested ❌</b>"
     )
+
+
+# ==========================================
+# BROADCAST COMMAND
+# ==========================================
+@Client.on_message(
+    filters.command("broadcast")
+    & filters.user(ADMINS)
+    & filters.reply
+)
+async def verupikkals(bot, message: Message):
+
+    global is_canceled
+
+    args = message.text.split()[1:]
+
+    # ======================================
+    # MODES
+    # ======================================
+    do_pin = False
+    do_delete = False
+    duration = 0
+    silent = False
+
+    mode_text = []
+
+    i = 0
+
+    while i < len(args):
+
+        arg = args[i].lower()
+
+        if arg == "pin":
+
+            do_pin = True
+            mode_text.append("PIN")
+
+        elif arg == "delete":
+
+            do_delete = True
+
+            try:
+                duration = int(args[i + 1])
+                i += 1
+
+            except (IndexError, ValueError):
+
+                return await message.reply_text(
+                    "<b>Provide valid delete duration.</b>\n\n"
+                    "Example:\n"
+                    "<code>/broadcast delete 30</code>"
+                )
+
+            mode_text.append(
+                f"DELETE({duration}s)"
+            )
+
+        elif arg == "silent":
+
+            silent = True
+            mode_text.append("SILENT")
+
+        else:
+
+            mode_text.append(arg.upper())
+
+        i += 1
+
+    if not mode_text:
+        mode_text.append("NORMAL")
+
+    # ======================================
+    # RESET CANCEL FLAG
+    # ======================================
+    async with cancel_lock:
+        is_canceled = False
+
+    users = await db.get_all_users()
+
+    b_msg = message.reply_to_message
+
+    sts = await message.reply_text(
+        text=(
+            f"<b>Broadcast Started "
+            f"({' + '.join(mode_text)})...</b>"
+        )
+    )
+
     start_time = time.time()
+
     total_users = await db.total_users_count()
+
     done = 0
     blocked = 0
     deleted = 0
-    failed =0
-
+    failed = 0
     success = 0
+
+    # ======================================
+    # PROGRESS SETTINGS
+    # ======================================
+    bar_length = 20
+    progress_bar = ""
+
+    # ======================================
+    # LOOP
+    # ======================================
     async for user in users:
-        if 'id' in user:
-            pti, sh = await broadcast_messages(int(user['id']), b_msg)
-            if pti:
-                success += 1
-            elif pti == False:
-                if sh == "Blocked":
-                    blocked += 1
-                elif sh == "Deleted":
-                    deleted += 1
-                elif sh == "Error":
-                    failed += 1
-            done += 1
-            if not done % 20:
-                await sts.edit(f"Broadcast in progress:\n\nTotal Users {total_users}\nCompleted: {done} / {total_users}\nSuccess: {success}\nBlocked: {blocked}\nDeleted: {deleted}")    
-        else:
-            # Handle the case where 'id' key is missing in the user dictionary
+
+        # CANCEL CHECK
+        async with cancel_lock:
+
+            if is_canceled:
+
+                return await sts.edit_text(
+                    "<b>Broadcast canceled ❌</b>"
+                )
+
+        # INVALID USER
+        if 'id' not in user:
+
             done += 1
             failed += 1
-            if not done % 20:
-                await sts.edit(f"Broadcast in progress:\n\nTotal Users {total_users}\nCompleted: {done} / {total_users}\nSuccess: {success}\nBlocked: {blocked}\nDeleted: {deleted}")    
-    
-    time_taken = datetime.timedelta(seconds=int(time.time()-start_time))
-    await sts.edit(f"Broadcast Completed:\nCompleted in {time_taken} seconds.\n\nTotal Users {total_users}\nCompleted: {done} / {total_users}\nSuccess: {success}\nBlocked: {blocked}\nDeleted: {deleted}")
+
+            continue
+
+        user_id = int(user['id'])
+
+        pti, sh = await broadcast_messages(
+            bot=bot,
+            user_id=user_id,
+            message=b_msg,
+            do_pin=do_pin,
+            do_delete=do_delete,
+            duration=duration,
+            silent=silent
+        )
+
+        # RESULTS
+        if pti:
+
+            success += 1
+
+        else:
+
+            if sh == "Blocked":
+                blocked += 1
+
+            elif sh == "Deleted":
+                deleted += 1
+
+            elif sh == "Error":
+                failed += 1
+
+        done += 1
+
+        # ==================================
+        # UPDATE STATUS
+        # ==================================
+        if not done % 20:
+
+            percent = done / total_users
+
+            filled = int(
+                percent * bar_length
+            )
+
+            progress_bar = (
+                "●" * filled
+                + "○" * (bar_length - filled)
+            )
+
+            try:
+
+                await sts.edit_text(
+                    f"""
+<b>📢 Broadcast In Progress...</b>
+
+<blockquote>
+[{progress_bar}] <code>{percent:.0%}</code>
+</blockquote>
+
+<b>Mode:</b> <code>{' + '.join(mode_text)}</code>
+
+<b>Total Users:</b> <code>{total_users}</code>
+
+<b>Completed:</b> <code>{done}/{total_users}</code>
+
+<b>✅ Success:</b> <code>{success}</code>
+<b>🚫 Blocked:</b> <code>{blocked}</code>
+<b>🗑 Deleted:</b> <code>{deleted}</code>
+<b>❌ Failed:</b> <code>{failed}</code>
+
+<i>Use /cancel to stop broadcast.</i>
+"""
+                )
+
+            except:
+                pass
+
+    # ======================================
+    # FINAL STATUS
+    # ======================================
+    time_taken = datetime.timedelta(
+        seconds=int(time.time() - start_time)
+    )
+
+    final_percent = done / total_users
+
+    filled = int(final_percent * bar_length)
+
+    progress_bar = (
+        "●" * filled
+        + "○" * (bar_length - filled)
+    )
+
+    await sts.edit_text(
+        f"""
+<b>📢 Broadcast Completed ✅</b>
+
+<blockquote>
+[{progress_bar}] <code>100%</code>
+</blockquote>
+
+<b>Mode:</b> <code>{' + '.join(mode_text)}</code>
+
+<b>Total Users:</b> <code>{total_users}</code>
+
+<b>Completed:</b> <code>{done}/{total_users}</code>
+
+<b>✅ Success:</b> <code>{success}</code>
+<b>🚫 Blocked:</b> <code>{blocked}</code>
+<b>🗑 Deleted:</b> <code>{deleted}</code>
+<b>❌ Failed:</b> <code>{failed}</code>
+
+<b>⏱ Time Taken:</b> <code>{time_taken}</code>
+"""
+    )
 
 
 
