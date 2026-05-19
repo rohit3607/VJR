@@ -153,10 +153,11 @@ async def cancel_broadcast(bot, message):
 @Client.on_message(
     filters.command("broadcast")
     & filters.user(ADMINS)
-    & filters.reply
 )
 async def verupikkals(bot, message: Message):
-
+    if not message.reply_to_message:
+        return await message.reply_text("**Reply To A Message To Broadcast.**")
+    
     global is_canceled
 
     args = message.text.split()[1:]
@@ -403,24 +404,7 @@ async def stats_handler(bot: Client, message: Message):
     total_channels = 0
     total_supergroups = 0
 
-    async for dialog in bot.get_dialogs():
-
-        try:
-            chat = dialog.chat
-
-            # only where bot is admin/member
-            if chat.type.name in ["GROUP", "SUPERGROUP"]:
-                total_groups += 1
-
-                if chat.type.name == "SUPERGROUP":
-                    total_supergroups += 1
-
-            elif chat.type.name == "CHANNEL":
-                total_channels += 1
-
-        except:
-            pass
-
+    
     # SYSTEM INFO
     cpu = psutil.cpu_percent(interval=1)
     ram = psutil.virtual_memory()
