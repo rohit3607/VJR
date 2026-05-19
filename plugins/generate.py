@@ -24,9 +24,12 @@ SESSION_STRING_SIZE = 351
 async def logout(client, message):
     user_data = await db.get_session(message.from_user.id)  
     if user_data is None:
-        return 
+        return await message.reply("**You Are Not Logged In. First /login**")
+        
     await db.set_session(message.from_user.id, session=None)  
     await message.reply("**Logout Successfully** ♦")
+
+
 
 @Client.on_message(filters.private & ~filters.forwarded & filters.command(["login"]))
 async def main(bot: Client, message: Message):
