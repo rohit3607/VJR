@@ -427,7 +427,7 @@ async def vers(bot, message):
     success = 0
     async for user in users:
         if 'id' in user:
-            pti, sh = await broadcast_messages(int(user['id']), b_msg)
+            pti, sh = await bcast_messages(int(user['id']), b_msg)
             if pti:
                 success += 1
             elif pti == False:
